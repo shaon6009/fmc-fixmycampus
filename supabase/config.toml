@@ -1,1 +1,4 @@
 project_id = "uvklggizlqyjbifhqahe"
+
+[functions.diu-chat]
+verify_jwt = false

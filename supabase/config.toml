@@ -2,3 +2,9 @@ project_id = "uvklggizlqyjbifhqahe"
 
 [functions.diu-chat]
 verify_jwt = false
+
+[functions.seed-admins]
+verify_jwt = false
+
+[functions.manage-admin-user]
+verify_jwt = true

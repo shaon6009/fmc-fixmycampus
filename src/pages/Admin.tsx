@@ -39,6 +39,7 @@ export default function Admin() {
             <TabsTrigger value="posts">Posts</TabsTrigger>
             {isSuperAdmin && <TabsTrigger value="groups">Groups</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="users">Users</TabsTrigger>}
+            {isSuperAdmin && <TabsTrigger value="credentials">Credentials</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="kb">Knowledge Base</TabsTrigger>}
             {isSuperAdmin && <TabsTrigger value="analytics">Analytics</TabsTrigger>}
           </TabsList>
@@ -46,6 +47,7 @@ export default function Admin() {
           <TabsContent value="posts"><AllPosts /></TabsContent>
           {isSuperAdmin && <TabsContent value="groups"><ManageGroups /></TabsContent>}
           {isSuperAdmin && <TabsContent value="users"><ManageUsers /></TabsContent>}
+          {isSuperAdmin && <TabsContent value="credentials"><ManageCredentials /></TabsContent>}
           {isSuperAdmin && <TabsContent value="kb"><KnowledgeBase /></TabsContent>}
           {isSuperAdmin && <TabsContent value="analytics"><Analytics /></TabsContent>}
         </Tabs>
@@ -288,6 +290,85 @@ function KnowledgeBase() {
               <p className="text-sm text-muted-foreground mt-1">{e.answer}</p>
             </div>
             <Button size="icon" variant="ghost" onClick={() => del(e.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function ManageCredentials() {
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
+  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [newEmail, setNewEmail] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const { session } = useAuth();
+  const { toast } = useToast();
+
+  const fetch_ = async () => {
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("user_id, role");
+    const { data: profiles } = await supabase.from("profiles").select("user_id, anonymous_id");
+    const adminRoles = (roles || []).filter((r: any) => r.role === "admin" || r.role === "super_admin");
+    const merged = adminRoles.map((r: any) => ({
+      ...r,
+      anonymous_id: profiles?.find((p: any) => p.user_id === r.user_id)?.anonymous_id,
+    }));
+    setAdminUsers(merged);
+  };
+  useEffect(() => { fetch_(); }, []);
+
+  const updateCredentials = async (userId: string) => {
+    const body: any = { action: "update_credentials", userId };
+    if (newEmail.trim()) body.email = newEmail.trim();
+    if (newPassword.trim()) body.password = newPassword.trim();
+
+    if (!body.email && !body.password) {
+      toast({ title: "Error", description: "Enter an email or password to update", variant: "destructive" });
+      return;
+    }
+
+    const { data, error } = await supabase.functions.invoke("manage-admin-user", {
+      body,
+    });
+
+    if (error || data?.error) {
+      toast({ title: "Error", description: error?.message || data?.error, variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Credentials updated" });
+      setEditingUser(null);
+      setNewEmail("");
+      setNewPassword("");
+    }
+  };
+
+  return (
+    <div className="space-y-3 pt-4">
+      <p className="text-sm text-muted-foreground">Manage admin and super admin credentials.</p>
+      {adminUsers.map((u) => (
+        <Card key={u.user_id + u.role}>
+          <CardContent className="pt-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium">{u.anonymous_id}</p>
+                <p className="text-xs text-muted-foreground capitalize">{u.role.replace("_", " ")}</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => {
+                setEditingUser(editingUser === u.user_id ? null : u.user_id);
+                setNewEmail("");
+                setNewPassword("");
+              }}>
+                {editingUser === u.user_id ? "Cancel" : "Edit"}
+              </Button>
+            </div>
+            {editingUser === u.user_id && (
+              <div className="space-y-2 pt-2 border-t">
+                <Input placeholder="New email (leave empty to keep)" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+                <Input type="password" placeholder="New password (leave empty to keep)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+                <Button size="sm" onClick={() => updateCredentials(u.user_id)}>Update Credentials</Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       ))}

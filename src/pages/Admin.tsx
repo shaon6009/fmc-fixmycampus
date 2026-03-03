@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Check, X, Trash2, UserX, UserCheck, Plus, Shield } from "lucide-react";
+import { ArrowLeft, Check, X, Trash2, UserX, UserCheck, Plus, Shield, Mail, Eye, EyeOff } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export default function Admin() {
@@ -187,6 +187,9 @@ function ManageGroups() {
 function ManageUsers() {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [roles, setRoles] = useState<Record<string, string[]>>({});
+  const [emails, setEmails] = useState<Record<string, string>>({});
+  const [showEmails, setShowEmails] = useState(false);
+  const { session } = useAuth();
   const { toast } = useToast();
 
   const fetch_ = async () => {
@@ -200,12 +203,34 @@ function ManageUsers() {
     });
     setRoles(roleMap);
   };
+
+  const fetchEmails = async () => {
+    if (Object.keys(emails).length > 0) {
+      setShowEmails(!showEmails);
+      return;
+    }
+    const { data, error } = await supabase.functions.invoke("admin-list-users");
+    if (error || data?.error) {
+      toast({ title: "Error", description: error?.message || data?.error, variant: "destructive" });
+      return;
+    }
+    const emailMap: Record<string, string> = {};
+    (data.users || []).forEach((u: any) => {
+      emailMap[u.id] = u.email;
+    });
+    setEmails(emailMap);
+    setShowEmails(true);
+  };
+
   useEffect(() => { fetch_(); }, []);
 
   const toggleBan = async (userId: string, currently: boolean) => {
     const { error } = await supabase.from("profiles").update({ is_banned: !currently }).eq("user_id", userId);
     if (error) toast({ title: "Error", description: error.message, variant: "destructive" });
-    else fetch_();
+    else {
+      toast({ title: currently ? "Unbanned" : "Banned", description: `User has been ${currently ? "unbanned" : "banned"}.` });
+      fetch_();
+    }
   };
 
   const toggleAdmin = async (userId: string) => {
@@ -220,23 +245,34 @@ function ManageUsers() {
 
   return (
     <div className="space-y-3 pt-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">{profiles.length} registered users</p>
+        <Button size="sm" variant="outline" onClick={fetchEmails}>
+          {showEmails ? <><EyeOff className="h-3 w-3 mr-1" />Hide Emails</> : <><Mail className="h-3 w-3 mr-1" />Show Emails</>}
+        </Button>
+      </div>
       {profiles.map((p) => (
-        <Card key={p.user_id}>
-          <CardContent className="flex items-center justify-between pt-4">
-            <div>
-              <p className="font-medium">{p.anonymous_id}</p>
-              <p className="text-xs text-muted-foreground">
-                Roles: {(roles[p.user_id] || ["user"]).join(", ")}
-                {p.is_banned && <span className="ml-2 text-destructive font-medium">BANNED</span>}
-              </p>
-            </div>
-            <div className="flex gap-1">
-              <Button size="sm" variant="outline" onClick={() => toggleAdmin(p.user_id)}>
-                {(roles[p.user_id] || []).includes("admin") ? "Remove Admin" : "Make Admin"}
-              </Button>
-              <Button size="sm" variant={p.is_banned ? "default" : "destructive"} onClick={() => toggleBan(p.user_id, p.is_banned)}>
-                {p.is_banned ? <><UserCheck className="h-3 w-3 mr-1" />Unban</> : <><UserX className="h-3 w-3 mr-1" />Ban</>}
-              </Button>
+        <Card key={p.user_id} className={p.is_banned ? "border-destructive/50 bg-destructive/5" : ""}>
+          <CardContent className="pt-4">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">{p.anonymous_id}</p>
+                {showEmails && emails[p.user_id] && (
+                  <p className="text-xs text-primary truncate"><Mail className="h-3 w-3 inline mr-1" />{emails[p.user_id]}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Roles: {(roles[p.user_id] || ["user"]).join(", ")}
+                  {p.is_banned && <span className="ml-2 text-destructive font-bold">⛔ BANNED</span>}
+                </p>
+              </div>
+              <div className="flex gap-1 flex-shrink-0">
+                <Button size="sm" variant="outline" onClick={() => toggleAdmin(p.user_id)}>
+                  {(roles[p.user_id] || []).includes("admin") ? "Remove Admin" : "Make Admin"}
+                </Button>
+                <Button size="sm" variant={p.is_banned ? "default" : "destructive"} onClick={() => toggleBan(p.user_id, p.is_banned)}>
+                  {p.is_banned ? <><UserCheck className="h-3 w-3 mr-1" />Unban</> : <><UserX className="h-3 w-3 mr-1" />Ban</>}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

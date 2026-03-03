@@ -2,7 +2,7 @@
 
 ## Project info
 
-**URL**: fmc-fixmycampus.lovable.app
+**URL**: (https://fmc-fixmycampus.lovable.app)
 
 ## How can I edit this code?
 
